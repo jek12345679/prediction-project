@@ -1,0 +1,88 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Zaki"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(caret)
+library(randomForest)
+library(rpart)
+library(e1071)
+library(ggplot2)
+library(dplyr)
+set.seed(12345)
+```
+
+## Pendahuluan
+
+Tujuan dari proyek ini adalah untuk memprediksi bagaimana subjek melakukan latihan angkat beban berdasarkan data sensor akselerometer yang dikumpulkan. Variabel target adalah `classe`, dan kita akan membangun model pembelajaran mesin untuk memprediksi nilai tersebut.
+
+## Persiapan dan Eksplorasi Data
+
+```{r load-data}
+training_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testing_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+training <- read.csv(url(training_url))
+testing <- read.csv(url(testing_url))
+```
+
+```{r clean-data}
+# Hapus kolom dengan banyak NA
+training <- training[, colSums(is.na(training)) == 0]
+testing <- testing[, colSums(is.na(testing)) == 0]
+
+# Hapus kolom tidak relevan (metadata)
+training <- training[, -c(1:7)]
+testing <- testing[, -c(1:7)]
+
+# Pecah training menjadi training dan validation
+inTrain <- createDataPartition(training$classe, p=0.7, list=FALSE)
+trainSet <- training[inTrain, ]
+valSet <- training[-inTrain, ]
+```
+
+## Pemodelan
+
+### Random Forest
+
+```{r rf-model}
+controlRF <- trainControl(method="cv", number=5)
+modelRF <- train(classe ~ ., data=trainSet, method="rf", trControl=controlRF)
+modelRF
+```
+
+## Evaluasi Model
+
+```{r eval-model}
+predRF <- predict(modelRF, valSet)
+confusionMatrix(predRF, valSet$classe)
+```
+
+## Prediksi pada Data Uji
+
+```{r predict-test}
+predictions <- predict(modelRF, testing)
+predictions
+```
+
+```{r save-predictions, echo=FALSE}
+# Simpan ke file untuk dikirim ke kuis
+pml_write_files <- function(x){
+  n <- length(x)
+  for(i in 1:n){
+    filename <- paste0("problem_id_", i, ".txt")
+    write.table(x[i], file=filename, quote=FALSE, row.names=FALSE, col.names=FALSE)
+  }
+}
+pml_write_files(predictions)
+```
+
+## Diskusi dan Kesimpulan
+
+Model Random Forest menunjukkan akurasi tinggi dan ketahanan terhadap overfitting. Validasi silang memastikan generalisasi yang baik. Model ini digunakan untuk memprediksi 20 kasus uji.
+
+## Reproduksibilitas
+
+Analisis ini dilakukan di R versi `r R.version.string` dengan paket `caret`, `randomForest`, dan lainnya sebagaimana ditunjukkan dalam chunk awal.
